@@ -18,7 +18,8 @@ STEP_USER_DATA_SCHEMA = vol.Schema({vol.Optional("buienalarm", default=False): b
                                     vol.Optional("buienradar", default=False): bool,
                                     vol.Optional("buienradarLatitude", description={"suggested_value": "55.00"}): str,
                                     vol.Optional("buienradarLongitude", description={"suggested_value": "5.00"}): str,
-                                    vol.Optional("NeerslagSensorUseHAforLocation", default=True): bool
+                                    vol.Optional("NeerslagSensorUseHAforLocation", default=True): bool,
+                                    vol.Optional("NeerslagStateInEnglish", default=False): bool
                                     })
 
 
@@ -116,7 +117,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                                vol.Optional("buienradar", default=self.config_entry.data.get("buienradar")): bool,
                                vol.Optional("buienradarLatitude", default=self.config_entry.data.get("buienradarLatitude")): str,
                                vol.Optional("buienradarLongitude", default=self.config_entry.data.get("buienradarLongitude")): str,
-                               vol.Optional("NeerslagSensorUseHAforLocation", default=self.config_entry.data.get("NeerslagSensorUseHAforLocation")): bool
+                               vol.Optional("NeerslagSensorUseHAforLocation", default=self.config_entry.data.get("NeerslagSensorUseHAforLocation")): bool,
+                               vol.Optional("NeerslagStateInEnglish", default=self.config_entry.data.get("NeerslagStateInEnglish")): bool
                                })
 
         # _LOGGER.info("----->>>>---------------")

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import json
 import logging
 import math
+import os
 import random as rand
 from random import random
 
@@ -92,7 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     async_add_entities([ NeerslagSensorBuienradar(hass, config_entry, doBuienradar) ], update_before_add=doBuienradar)
 
     # Add 'main' sensor, it will be updated automatically by the others so we don't need to update before add.
-    async_add_entities([ NeerslagSensor(hass, config_entry, True) ])
+    async_add_entities([ NeerslagStatus(hass, config_entry, True) ])
 
         # async_add_entities([NeerslagSensor(hass, config_entry)])
 
@@ -224,7 +225,7 @@ class NeerslagSensorBuienalarm(mijnBasis):
         self._lon = f'{float(self._lon):.3f}'
 
         # self._entity_picture = "https://www.buienalarm.nl/assets/img/social.png"
-        self._icon = "mdi:weather-rainy"
+        self._icon = "mdi:weather-cloudy"
 
     @property
     def icon(self):
@@ -290,7 +291,7 @@ class NeerslagSensorBuienradar(mijnBasis):
         self._lon = f'{float(self._lon):.2f}'
 
         # self._entity_picture = "https://cdn.buienradar.nl/resources/images/br-logo-square.png"
-        self._icon = "mdi:weather-rainy"
+        self._icon = "mdi:weather-cloudy"
 
     @property
     def icon(self):
@@ -333,14 +334,20 @@ class NeerslagSensorBuienradar(mijnBasis):
         return data
 
 
-class NeerslagSensor(mijnBasis):
+class NeerslagStatus(mijnBasis):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, enabled: bool):
         super().__init__(hass=hass, config_entry=config_entry, enabled=enabled)
-        self._name = "neerslag_sensor"
+        self._name = "neerslag_status"
         self._state = STATE_UNKNOWN
-        self._unique_id = "neerslag-sensor-1"
+        self._unique_id = "neerslag-status-1"
         self._enabled = enabled
-        self._icon = "mdi:weather-rainy"
+        self._icon = "mdi:weather-cloudy"
+
+        # Load translations
+        if (config_entry.data.get("NeerslagStateInEnglish") == True):
+            self._translations = self.load_translations('en')
+        else:
+            self._translations = self.load_translations('nl')
 
         # Save which 'sources' are available and assign change handler
         self._process_buienalarm = (config_entry.data.get("buienalarm") == True)
@@ -348,7 +355,7 @@ class NeerslagSensor(mijnBasis):
         config_entry.add_update_listener(self.config_update_listener)
 
         # Reset buffer and assign change handlers
-        self._buffer = { "buienradar": {}, "buienalarm": {} }
+        self._attributes = { "icon": "mdi:weather-cloudy", "rain_level": "", "is_raining": False, "data": {} }
         async_track_state_change(hass, [ "sensor.neerslag_buienalarm_regen_data", "sensor.neerslag_buienradar_regen_data" ], self.parse_rain_source_data)
 
     @property
@@ -357,7 +364,22 @@ class NeerslagSensor(mijnBasis):
 
     @property
     def extra_state_attributes(self):
-        return self._buffer
+        return self._attributes
+
+    def load_translations(self, lang):
+        data = {}
+        translation_file = os.path.join(os.path.dirname(__file__), "translations/" + lang + ".json")
+
+        try:
+            f = open(translation_file)
+            data = json.load(f)
+            data = data['sensor'] # Only interested in sensor translations
+            f.close()
+        except:
+            _LOGGER.error("NeerslagSensor->load_translations(): failed to load " + translation_file)
+            pass
+
+        return data
 
     async def config_update_listener(self, hass: HomeAssistant, config_entry: ConfigEntry, pp=None):
         self._process_buienalarm = (config_entry.data.get("buienalarm") == True)
@@ -375,6 +397,7 @@ class NeerslagSensor(mijnBasis):
 
         # Save today date for comparison
         dt_today = datetime.today()
+        old_data = self._attributes["data"]
 
         # Get sensor data for Buienalarm
         if (entity_id == "sensor.neerslag_buienalarm_regen_data"):
@@ -388,22 +411,17 @@ class NeerslagSensor(mijnBasis):
                 dt_entry = dt_start
 
                 # Loop entries
-                old_buffer = self._buffer["buienalarm"]
                 for entry in val["precip"]:
+                    # Initialize dictionary if needed
+                    data_key = dt_entry.strftime("%Y%m%d%H%M%S")
+                    if (not data_key in old_data):
+                        old_data[data_key] = { "time": dt_entry.strftime("%X") }
+
                     # Add to dictionary
-                    key = dt_entry.strftime("%Y%m%d%H%M%S")
-                    rain_val = entry
-                    old_buffer[key] = { "time": dt_entry.strftime("%X"), "precip": rain_val }
+                    old_data[data_key]["buienalarm"] = entry
 
                     # Add the delta
                     dt_entry = dt_entry + timedelta(seconds=dt_delta)
-
-                # Remove all 'keys' that occured in the past to keep the data clean.
-                self._buffer["buienalarm"] = {}
-                dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
-                for key, val in old_buffer.items():
-                    if (key > dt_remove_before):
-                        self._buffer["buienalarm"][key] = val
 
         # Get sensor data for Buienradar
         if (entity_id == "sensor.neerslag_buienradar_regen_data"):
@@ -416,7 +434,6 @@ class NeerslagSensor(mijnBasis):
 
                 # Loop entries
                 entries = csv.reader(val.strip().split(), delimiter='|')
-                old_buffer = self._buffer["buienradar"]
                 for entry in entries:
                     # Convert 'time' to include the date.
                     dt_entry = datetime.combine(dt_today, datetime.strptime(entry[1] + ":00", '%H:%M:%S').time())
@@ -428,31 +445,132 @@ class NeerslagSensor(mijnBasis):
                         # In case we pass midnight, add 1 day to make sure our 'garbage collector' still works later on.
                         dt_entry = dt_entry + timedelta(days=1)
 
+                    # Initialize dictionary if needed
+                    data_key = dt_entry.strftime("%Y%m%d%H%M%S")
+                    if (not data_key in old_data):
+                        old_data[data_key] = { "time": dt_entry.strftime("%X") }
+
                     # Add to dictionary
-                    key = dt_entry.strftime("%Y%m%d%H%M%S")
-                    rain_val = round(math.pow(10, ((int(entry[0]) - 109) / 32)), 3)
-                    old_buffer[key] = { "time": dt_entry.strftime("%X"), "precip": rain_val }
+                    old_data[data_key]["buienradar"] = round(math.pow(10, ((int(entry[0]) - 109) / 32)), 3)
 
-                # Remove all 'keys' that occured in the past to keep the data clean.
-                self._buffer["buienradar"] = {}
-                dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
-                for key, val in old_buffer.items():
-                    if (key > dt_remove_before):
-                        self._buffer["buienradar"][key] = val
+        # Only keep keys which are in the future
+        self._attributes["data"] = {}
+        dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
+        for key, val in old_data.items():
+            if (key > dt_remove_before):
+                self._attributes["data"][key] = val
 
-        # The first time we get here there is only 1 sensor filled, but we need both.
-        max_elems = min(len(self._buffer["buienalarm"]), len(self._buffer["buienradar"]))
-        if(max_elems == 0):
+        # Data not yet complete
+        if(not len(self._attributes["data"])):
+            _LOGGER.error("No items in buffer!")
             return
-        _LOGGER.error("parse_rain_source_data() --> will only process " + str(max_elems) + " items.")
 
-        # At this stage of the method, we have 2 arrays which are 'normalized' and only contain 'future' rain predictions.
-        # We can now loop both arrays and determine if it is raining...
+        # Save current states
+        prev_status = self._state
+        prev_icon = self._attributes["icon"]
+        prev_is_raining = self._attributes["is_raining"]
+        prev_rain_level = self._attributes["rain_level"]
+
+        # raining_state explained:
+        # 0: Geen neerslag
+        # 1: Neerslag
+        # 2: Neerslag stopt rond {}
+        # 3: Neerslag stopt rond {} en begint weer rond {}
+        # 4: Neerslag begint rond {}
+        # 5: Neerslag begint rond {} en duurt ongeveer tot {}
+        raining_state = None
+        maxP = 0
+        maxDT = None
+        new_status = ""
+
+        # We can now loop the data and determine if it is dry or raining and when that will change...
+        for key, val in self._attributes["data"].items():
+            # Combine information from buienalarm and buienradar
+            p = 0
+            if ("buienalarm" in val):
+                p += val["buienalarm"]
+
+            if ("buienradar" in val):
+                p += val["buienradar"]
+
+            # We have a value, so now we can check it.
+            dt = datetime.strptime(key,'%Y%m%d%H%M%S')
+            if (raining_state is None):
+                if (p == 0):
+                    # Currently no rain
+                    raining_state = 0
+                    new_status = self._translations['status']['no_precip']
+                else:
+                    # It is raining now
+                    raining_state = 1
+                    new_status = self._translations['status']['precip']
+            else:
+                if (raining_state == 0):
+                    if (p > 0):
+                        # Rain starts within 2 hours
+                        raining_state = 4
+                        new_status = self._translations['status']['starts'].format(dt)
+                elif (raining_state == 1):
+                    if (p == 0):
+                        # It is currently raining but will stop within 2 hours
+                        raining_state = 2
+                        new_status = self._translations['status']['stops'].format(dt)
+                elif (raining_state == 2):
+                    if (p > 0):
+                        # Raining will stop but restart within 2 hours
+                        raining_state = 3
+                        new_status += self._translations['status']['starts_again'].format(dt)
+                elif (raining_state == 4):
+                    if (p == 0):
+                        # Rain starts within 2 hours but will stop
+                        raining_state = 5
+                        new_status += self._translations['status']['stops_at'].format(dt)
+
+            if (p > maxP):
+                maxP = p
+                maxDT = dt
+
+        # Check previous values
+        new_is_raining = (maxP > 0.1)
+
+        # The following values are taken for the mm/hr precipitation:
+        # - geen neerslag 0 mm
+        # - lichte neerslag 0.1-1 mm
+        # - matige neerslag 1-3 mm
+        # - zware neerslag 3-10 mm
+        # - zware buien > 10
+        maxP = round(maxP, 1)
+        if (maxP < 0.1):
+            new_icon = "mdi:weather-cloudy"
+            new_rain_level = self._translations['rain_level']['none']
+        elif (maxP <= 1):
+            new_icon = "mdi:weather-partly-rainy"
+            new_rain_level = self._translations['rain_level']['light'].format(maxP, maxDT)
+        elif (maxP <= 3):
+            new_icon = "mdi:weather-rainy"
+            new_rain_level = self._translations['rain_level']['moderate'].format(maxP, maxDT)
+        elif (maxP <= 10):
+            new_icon = "mdi:weather-pouring"
+            new_rain_level = self._translations['rain_level']['heavy'].format(maxP, maxDT)
+        elif (maxP > 10):
+            new_icon = "mdi:weather-pouring"
+            new_rain_level = self._translations['rain_level']['extreme'].format(maxP, maxDT)
+
+        # Finish sentences
+        new_status += "."
+        new_rain_level += "."
 
         # Update the state of this sensor, but only if the input data changed.
-        self.schedule_update_ha_state(True)
+        if ((new_status != prev_status) or
+            (new_icon != prev_icon) or
+            (new_is_raining != prev_is_raining) or
+            (new_rain_level != prev_rain_level)):
+            # Something changed, so update the state!
+            self._state = new_status
+            self._attributes["icon"] = new_icon
+            self._attributes["is_raining"] = new_is_raining
+            self._attributes["rain_level"] = new_rain_level
+            self.schedule_update_ha_state(True)
 
     async def async_update(self):
-        if (self._enabled == True):
-            self._state = random()
         return True

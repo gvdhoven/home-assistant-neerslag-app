@@ -12,6 +12,7 @@
             "user": {
                 "data": {
                     "NeerslagSensorUseHAforLocation": "Use the location settings (latitude/longitude) of Home Assistant (Overrides all other location settings)",
+                    "NeerslagStateInEnglish": "The current rain status will be shown in English (by default it will be shown in Dutch)",
                     "buienalarm": "Enable Buienalarm",
                     "buienalarmLatitude": "Latitude",
                     "buienalarmLongitude": "Longitude",
@@ -32,6 +33,7 @@
             "init": {
                 "data": {
                     "NeerslagSensorUseHAforLocation": "Use the location settings (latitude/longitude) of Home Assistant (Overrides all other location settings)",
+                    "NeerslagStateInEnglish": "The current rain status will be shown in English (by default it will be shown in Dutch)",
                     "buienalarm": "Enable Buienalarm",
                     "buienalarmLatitude": "Latitude",
                     "buienalarmLongitude": "Longitude",
@@ -45,6 +47,23 @@
                 "description": "Changes (after clicking submit) take a couple of minutes to process.",
                 "title": "Neerslag App options"
             }
+        }
+    },
+    "sensor": {
+        "status": {
+            "no_precip": "It is dry",
+            "precip": "It is raining",
+            "starts": "Precipitation starts around {:%H:%M}",
+            "stops": "Precipitation stops around {:%H:%M}",
+            "starts_again": " and starts again around {:%H:%M}",
+            "stops_at": " and lasts approximately until {:%H:%M}"
+        },
+        "rain_level": {
+            "none": "No rainfall expected",
+            "light": "Light rainfall ({} mm/h @ {:%H:%M})",
+            "moderate": "Moderate rainfall ({} mm/h @ {:%H:%M})",
+            "heavy": "Heavy rainfall ({} mm/h @ {:%H:%M})",
+            "extreme": "Heavy showers ({} mm/h @ {:%H:%M})"
         }
     },
     "title": "Neerslag App (Buienalarm / Buienradar)"

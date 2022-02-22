@@ -12,6 +12,7 @@
             "user": {
                 "data": {
                     "NeerslagSensorUseHAforLocation": "Gebruik de locatie instellingen (latitude/longitude) van Home Assistant (deze optie overschrijft de andere locatie instellingen)",
+                    "NeerslagStateInEnglish": "De huidige regen status zal in het English weergegeven worden (standaard in het Nederlands)",
                     "buienalarm": "Activeer Buienalarm",
                     "buienalarmLatitude": "Latitude",
                     "buienalarmLongitude": "Longitude",
@@ -32,6 +33,7 @@
             "init": {
                 "data": {
                     "NeerslagSensorUseHAforLocation": "Gebruik de locatie instellingen (latitude/longitude) van Home Assistant (deze optie overschrijft de andere locatie instellingen)",
+                    "NeerslagStateInEnglish": "De huidige regen status zal in het English weergegeven worden (standaard in het Nederlands)",
                     "buienalarm": "Activeer Buienalarm",
                     "buienalarmLatitude": "Latitude",
                     "buienalarmLongitude": "Longitude",
@@ -45,6 +47,23 @@
                 "description": "Het kan een paar minuten duren voordat de veranderingen verwerkt zijn.",
                 "title": "Neerslag App opties"
             }
+        }
+    },
+    "sensor": {
+        "status": {
+            "no_precip": "Het is droog",
+            "precip": "Het regent",
+            "starts": "Neerslag begint rond {:%H:%M}",
+            "stops": "Neerslag stopt rond {:%H:%M}",
+            "starts_again": " en begint weer rond {:%H:%M}",
+            "stops_at": " en duurt ongeveer tot {:%H:%M}"
+        },
+        "rain_level": {
+            "none": "Geen neerslag verwacht",
+            "light": "Lichte neerslag ({} mm/h @ {:%H:%M})",
+            "moderate": "Matige neerslag ({} mm/h @ {:%H:%M})",
+            "heavy": "Zware neerslag ({} mm/h @ {:%H:%M})",
+            "extreme": "Zware buien ({} mm/h @ {:%H:%M})"
         }
     },
     "title": "Neerslag App (Buienalarm / Buienradar)"
