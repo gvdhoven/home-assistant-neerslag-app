@@ -1,25 +1,17 @@
-from homeassistant.block_async_io import enable
-from homeassistant.helpers.entity_platform import EntityPlatform
-import logging
-from os import truncate
 import aiohttp
-
-from random import random
-import random as rand
-
+import csv
+from datetime import datetime, timedelta
 import json
-from homeassistant.helpers.entity import Entity
-from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME, CONF_SOURCE
-from datetime import timedelta
+import logging
+import math
+import random as rand
+from random import random
+
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import STATE_UNKNOWN, STATE_UNAVAILABLE
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import EntityPlatform, async_get_platforms
-
-from homeassistant.helpers.entity_registry import (
-    async_entries_for_config_entry,
-    async_entries_for_device,
-)
-
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.event import async_track_state_change
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,6 +91,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     doBuienradar = (config_entry.data.get("buienradar") == True)
     async_add_entities([ NeerslagSensorBuienradar(hass, config_entry, doBuienradar) ], update_before_add=doBuienradar)
 
+    # Add 'main' sensor, it will be updated automatically by the others so we don't need to update before add.
+    async_add_entities([ NeerslagSensor(hass, config_entry, True) ])
 
         # async_add_entities([NeerslagSensor(hass, config_entry)])
 
@@ -160,15 +154,15 @@ class mijnBasis(Entity):
         """Return True if entity is available."""
         return self._enabled
 
-    @ property
+    @property
     def state(self):
         return self._state
 
-    @ property
+    @property
     def name(self):
         return self._name
 
-    @ property
+    @property
     def unique_id(self):
         """Return unique ID."""
         return self._unique_id
@@ -183,7 +177,7 @@ class DummyABC(mijnBasis):
         super().__init__(hass=hass, config_entry=config_entry, enabled=enabled)
         self._name = "neerslag_DummyABC"
         self._state = "working"  # None
-        self._attrs = ["data empty"]
+        self._attrs = {}
         self._unique_id = "neerslag-sensor-DummyABC"
 
         self._enabled = enabled
@@ -195,7 +189,7 @@ class DummyDEF(mijnBasis):
         super().__init__(hass=hass, config_entry=config_entry, enabled=enabled)
         self._name = "neerslag_DummyDEF"
         self._state = "working"  # None
-        self._attrs = ["data empty"]
+        self._attrs = {}
         self._unique_id = "neerslag-sensor-DummyDEF"
 
         # _LOGGER.info(">>>>>>>>>>>>>>>>>>>>>>>>")
@@ -211,7 +205,7 @@ class NeerslagSensorBuienalarm(mijnBasis):
         super().__init__(hass=hass, config_entry=config_entry, enabled=enabled)
         self._name = "neerslag_buienalarm_regen_data"
         self._state = "working"  # None
-        self._attrs = ["data empty"]
+        self._attrs = {}
         self._unique_id = "neerslag-sensor-buienalarm-1"
 
         self._enabled = enabled
@@ -232,11 +226,11 @@ class NeerslagSensorBuienalarm(mijnBasis):
         # self._entity_picture = "https://www.buienalarm.nl/assets/img/social.png"
         self._icon = "mdi:weather-rainy"
 
-    @ property
+    @property
     def icon(self):
         return self._icon
 
-    @ property
+    @property
     def state_attributes(self):
         if not len(self._attrs):
             return
@@ -277,7 +271,7 @@ class NeerslagSensorBuienradar(mijnBasis):
 
         self._name = "neerslag_buienradar_regen_data"
         self._state = "working"  # None
-        self._attrs = ["data empty"]
+        self._attrs = {}
         self._unique_id = "neerslag-sensor-buienradar-1"
 
         self._enabled = enabled
@@ -298,11 +292,11 @@ class NeerslagSensorBuienradar(mijnBasis):
         # self._entity_picture = "https://cdn.buienradar.nl/resources/images/br-logo-square.png"
         self._icon = "mdi:weather-rainy"
 
-    @ property
+    @property
     def icon(self):
         return self._icon
 
-    @ property
+    @property
     def state_attributes(self):
         if not len(self._attrs):
             return
@@ -337,3 +331,128 @@ class NeerslagSensorBuienradar(mijnBasis):
             pass
 
         return data
+
+
+class NeerslagSensor(mijnBasis):
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry, enabled: bool):
+        super().__init__(hass=hass, config_entry=config_entry, enabled=enabled)
+        self._name = "neerslag_sensor"
+        self._state = STATE_UNKNOWN
+        self._unique_id = "neerslag-sensor-1"
+        self._enabled = enabled
+        self._icon = "mdi:weather-rainy"
+
+        # Save which 'sources' are available and assign change handler
+        self._process_buienalarm = (config_entry.data.get("buienalarm") == True)
+        self._process_buienradar = (config_entry.data.get("buienradar") == True)
+        config_entry.add_update_listener(self.config_update_listener)
+
+        # Reset buffer and assign change handlers
+        self._buffer = { "buienradar": {}, "buienalarm": {} }
+        async_track_state_change(hass, [ "sensor.neerslag_buienalarm_regen_data", "sensor.neerslag_buienradar_regen_data" ], self.parse_rain_source_data)
+
+    @property
+    def icon(self):
+        return self._icon
+
+    @property
+    def extra_state_attributes(self):
+        return self._buffer
+
+    async def config_update_listener(self, hass: HomeAssistant, config_entry: ConfigEntry, pp=None):
+        self._process_buienalarm = (config_entry.data.get("buienalarm") == True)
+        self._process_buienradar = (config_entry.data.get("buienradar") == True)
+        self._enabled = (self._process_buienalarm or self._process_buienradar)
+
+    @callback
+    def parse_rain_source_data(self, entity_id, old_state, new_state):
+        if (self._enabled == False):
+            return
+        elif (new_state is None):
+            return
+        elif (new_state.state in [STATE_UNKNOWN, STATE_UNAVAILABLE]):
+            return
+
+        # Save today date for comparison
+        dt_today = datetime.today()
+
+        # Get sensor data for Buienalarm
+        if (entity_id == "sensor.neerslag_buienalarm_regen_data"):
+            for key, val in new_state.attributes.items():
+                if (key != "data"):
+                    continue
+
+                # Initialize
+                dt_start = datetime.fromtimestamp(val["start"])
+                dt_delta = val["delta"]
+                dt_entry = dt_start
+
+                # Loop entries
+                old_buffer = self._buffer["buienalarm"]
+                for entry in val["precip"]:
+                    # Add to dictionary
+                    key = dt_entry.strftime("%Y%m%d%H%M%S")
+                    rain_val = entry
+                    old_buffer[key] = { "time": dt_entry.strftime("%X"), "precip": rain_val }
+
+                    # Add the delta
+                    dt_entry = dt_entry + timedelta(seconds=dt_delta)
+
+                # Remove all 'keys' that occured in the past to keep the data clean.
+                self._buffer["buienalarm"] = {}
+                dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
+                for key, val in old_buffer.items():
+                    if (key > dt_remove_before):
+                        self._buffer["buienalarm"][key] = val
+
+        # Get sensor data for Buienradar
+        if (entity_id == "sensor.neerslag_buienradar_regen_data"):
+            for key, val in new_state.attributes.items():
+                if (key != "data"):
+                    continue
+
+                # Initialize
+                dt_start_hour = None
+
+                # Loop entries
+                entries = csv.reader(val.strip().split(), delimiter='|')
+                old_buffer = self._buffer["buienradar"]
+                for entry in entries:
+                    # Convert 'time' to include the date.
+                    dt_entry = datetime.combine(dt_today, datetime.strptime(entry[1] + ":00", '%H:%M:%S').time())
+
+                    # Make sure the date is correct
+                    if (dt_start_hour is None):
+                        dt_start_hour = dt_entry.hour
+                    elif (dt_entry.hour < dt_start_hour):
+                        # In case we pass midnight, add 1 day to make sure our 'garbage collector' still works later on.
+                        dt_entry = dt_entry + timedelta(days=1)
+
+                    # Add to dictionary
+                    key = dt_entry.strftime("%Y%m%d%H%M%S")
+                    rain_val = round(math.pow(10, ((int(entry[0]) - 109) / 32)), 3)
+                    old_buffer[key] = { "time": dt_entry.strftime("%X"), "precip": rain_val }
+
+                # Remove all 'keys' that occured in the past to keep the data clean.
+                self._buffer["buienradar"] = {}
+                dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
+                for key, val in old_buffer.items():
+                    if (key > dt_remove_before):
+                        self._buffer["buienradar"][key] = val
+
+        # The first time we get here there is only 1 sensor filled, but we need both.
+        max_elems = min(len(self._buffer["buienalarm"]), len(self._buffer["buienradar"]))
+        if(max_elems == 0):
+            return
+        _LOGGER.error("parse_rain_source_data() --> will only process " + str(max_elems) + " items.")
+
+        # At this stage of the method, we have 2 arrays which are 'normalized' and only contain 'future' rain predictions.
+        # We can now loop both arrays and determine if it is raining...
+
+        # Update the state of this sensor, but only if the input data changed.
+        self.schedule_update_ha_state(True)
+
+    async def async_update(self):
+        if (self._enabled == True):
+            self._state = random()
+        return True
