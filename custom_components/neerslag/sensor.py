@@ -91,17 +91,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     # if config_entry.data.get("buienradar") == False:
     #     async_add_entities([DummyDEF(hass, config_entry, False)], update_before_add=False)
 
-    if config_entry.data.get("buienalarm") == True:
-        async_add_entities([NeerslagSensorBuienalarm(hass, config_entry, True)], update_before_add=True)
+    # Add buienalarm sensor
+    doBuienalarm = (config_entry.data.get("buienalarm") == True)
+    async_add_entities([ NeerslagSensorBuienalarm(hass, config_entry, doBuienalarm) ], update_before_add=doBuienalarm)
 
-    if config_entry.data.get("buienalarm") == False:
-        async_add_entities([NeerslagSensorBuienalarm(hass, config_entry, False)], update_before_add=False)
+    # Add buienradar sensor
+    doBuienradar = (config_entry.data.get("buienradar") == True)
+    async_add_entities([ NeerslagSensorBuienradar(hass, config_entry, doBuienradar) ], update_before_add=doBuienradar)
 
-    if config_entry.data.get("buienradar") == True:
-        async_add_entities([NeerslagSensorBuienradar(hass, config_entry, True)], update_before_add=True)
-
-    if config_entry.data.get("buienradar") == False:
-        async_add_entities([NeerslagSensorBuienradar(hass, config_entry, False)], update_before_add=False)
 
         # async_add_entities([NeerslagSensor(hass, config_entry)])
 
