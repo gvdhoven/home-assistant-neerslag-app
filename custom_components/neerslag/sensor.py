@@ -15,7 +15,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import EntityPlatform, async_get_platforms
 
-
 from homeassistant.helpers.entity_registry import (
     async_entries_for_config_entry,
     async_entries_for_device,
@@ -25,7 +24,6 @@ from homeassistant.helpers.entity_registry import (
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=180)
-
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
     """Set up sensor entity."""
@@ -235,7 +233,7 @@ class NeerslagSensorBuienalarm(mijnBasis):
         self._lon = f'{float(self._lon):.3f}'
 
         # self._entity_picture = "https://www.buienalarm.nl/assets/img/social.png"
-        self._icon = "mdi:weather-cloudy"
+        self._icon = "mdi:weather-rainy"
 
     @ property
     def icon(self):
@@ -301,7 +299,7 @@ class NeerslagSensorBuienradar(mijnBasis):
         self._lon = f'{float(self._lon):.2f}'
 
         # self._entity_picture = "https://cdn.buienradar.nl/resources/images/br-logo-square.png"
-        self._icon = "mdi:weather-cloudy"
+        self._icon = "mdi:weather-rainy"
 
     @ property
     def icon(self):
