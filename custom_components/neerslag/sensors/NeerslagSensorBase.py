@@ -295,6 +295,7 @@ class NeerslagSensorBase(Entity):
         rain_prediction_attr['for_at_least'] = (rain_prediction_attr['when'] - curDT).total_seconds() / 60.0
         if (rain_prediction_attr['for_at_least'] > 90):
             rain_prediction_attr['for_at_least'] = 90
+        rain_prediction_attr['when'] = curDT
 
         # Compare states and update sensor if needed
         rain_prediction_attr_equal = self.equal_dicts(rain_prediction_attr, _last_rain_prediction_attr, ['when'] )
