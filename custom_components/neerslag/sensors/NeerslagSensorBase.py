@@ -106,10 +106,11 @@ class NeerslagSensorBase(Entity):
 
     def initSensorAttributes(self, p, dt):
         attr = { }
-        attr['level'] = self.getRainLevel(p)
         attr['dry'] = (p == 0)
-        attr['when'] = dt
+        attr['from_dt'] = dt
+        attr['to_dt'] = dt
         attr['mm_hr'] = p
+        attr['level'] = self.getRainLevel(p)
         attr['icon'] = self.getRainIcon(attr['level'])
         return attr
 
@@ -273,12 +274,14 @@ class NeerslagSensorBase(Entity):
 
         # Calculate how long this state 'lasts' but maximize it at 1.5hrs.
         # We maximize this because (depending on the data we get from both sources) otherwise it would sometimes be 105, sometimes 110 etc.
-        rain_now_attr['for_at_least'] = (rain_prediction_attr['when'] - curDT).total_seconds() / 60.0
+        rain_now_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - curDT).total_seconds() / 60.0
         if (rain_now_attr['for_at_least'] > 90):
             rain_now_attr['for_at_least'] = 90
+        rain_now_attr['from_dt'] = curDT
+        rain_now_attr['to_dt'] = curDT + timedelta(minutes=rain_now_attr['for_at_least'])
 
         # Compare states and update sensor if needed
-        rain_now_attr_equal = self.equal_dicts(rain_now_attr, _last_rain_now_attr, ['when'] )
+        rain_now_attr_equal = self.equal_dicts(rain_now_attr, _last_rain_now_attr, [ 'from_dt', 'to_dt' ])
         if ((rain_now != _last_rain_now) or (not rain_now_attr_equal)):
             _last_rain_now = rain_now
             _last_rain_now_attr = rain_now_attr
@@ -292,13 +295,14 @@ class NeerslagSensorBase(Entity):
 
         # Calculate how long this state 'lasts' but maximize it at 1.5hrs.
         # We maximize this because (depending on the data we get from both sources) otherwise it would sometimes be 105, sometimes 110 etc.
-        rain_prediction_attr['for_at_least'] = (rain_prediction_attr['when'] - curDT).total_seconds() / 60.0
+        rain_prediction_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - curDT).total_seconds() / 60.0
         if (rain_prediction_attr['for_at_least'] > 90):
             rain_prediction_attr['for_at_least'] = 90
-        rain_prediction_attr['when'] = curDT
+        rain_prediction_attr['from_dt'] = curDT
+        rain_prediction_attr['to_dt'] = curDT + timedelta(minutes=rain_prediction_attr['for_at_least'])
 
         # Compare states and update sensor if needed
-        rain_prediction_attr_equal = self.equal_dicts(rain_prediction_attr, _last_rain_prediction_attr, ['when'] )
+        rain_prediction_attr_equal = self.equal_dicts(rain_prediction_attr, _last_rain_prediction_attr, [ 'from_dt', 'to_dt' ])
         if ((rain_prediction != _last_rain_prediction) or (not rain_prediction_attr_equal)):
             _last_rain_prediction = rain_prediction
             _last_rain_prediction_attr = rain_prediction_attr
