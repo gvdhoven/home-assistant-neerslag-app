@@ -1,8 +1,8 @@
 import logging
 import random
+from datetime import datetime
 import requests
 
-from datetime import datetime
 from homeassistant.util import Throttle
 
 from . import NeerslagSensorBase
@@ -23,16 +23,15 @@ class NeerslagSensorBuienalarm(NeerslagSensorBase.NeerslagSensorBase):
 
     @property
     def state_attributes(self):
-        if not len(self._attrs):
-            return
         return self._attrs
 
     async def config_update_listener(self, hass, config, pp=None):
-        self._enabled = (config.data.get('buienalarm') == True)
+        # pylint:disable=unused-argument,invalid-name
+        self._enabled = (config.data.get('buienalarm') is True)
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
-        if(self._enabled == False):
+        if(self._enabled is False):
             _LOGGER.error('Buienalarm update called, but not enabled ...')
             return
 
@@ -40,15 +39,15 @@ class NeerslagSensorBuienalarm(NeerslagSensorBase.NeerslagSensorBase):
         try:
             response = requests.get(url)
             response.raise_for_status()
-        except HTTPError as http_err:
-            _LOGGER.warning("HTTP Error: %s", http_err)
-        except Exception as exc:
-            _LOGGER.warning("Other Error: %s", exc)
+        except requests.exceptions.HTTPError as http_err:
+            _LOGGER.error("HTTP Error: %s", http_err)
+        except Exception as exc: # pylint: disable=broad-except
+            _LOGGER.error("Other Error: %s", exc)
 
         try:
             self._attrs['updated_at'] = datetime.now().strftime("%X")
             self._attrs['data'] = response.json()
             self._state = random.random()
             self.update_neerslag_sensor_cache({ "source": self._name, "data": self._attrs['data'] })
-        except Exception as exc:
-            _LOGGER.warning("Parse Error: %s", exc)
+        except Exception as exc: # pylint: disable=broad-except
+            _LOGGER.error("Parse Error: %s", exc)

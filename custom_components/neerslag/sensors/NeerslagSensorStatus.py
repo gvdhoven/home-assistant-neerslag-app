@@ -11,9 +11,8 @@ class NeerslagSensorStatus(Entity):
 
     @property
     def state_attributes(self):
-        if not len(self._attrs):
-            return
         return self._attrs
 
     async def config_update_listener(self, hass, config, pp=None):
-        self._enabled = ((config.data.get('buienalarm') == True) or (config.data.get('buienradar') == True))
+        # pylint:disable=unused-argument,invalid-name
+        self._enabled = ((config.data.get('buienalarm') is True) or (config.data.get('buienradar') is True))

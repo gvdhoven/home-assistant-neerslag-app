@@ -1,3 +1,4 @@
+# pylint: disable=superfluous-parens
 import logging
 
 from .sensors import NeerslagSensorBuienalarm
@@ -10,33 +11,33 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up sensor entity."""
 
     # Setup buienalarm
-    buienAlarm = (config_entry.data.get('buienalarm') == True)
-    buienAlarmLat = hass.config.latitude
-    buienAlarmLon = hass.config.longitude
-    if (config_entry.data.get('NeerslagSensorUseHAforLocation') == False):
-        buienAlarmLat = config_entry.data.get('buienalarmLatitude')
-        buienAlarmLon = config_entry.data.get('buienalarmLongitude')
+    buienalarm_enabled = (config_entry.data.get('buienalarm') is True)
+    buienalarm_lat = hass.config.latitude
+    buienalarm_lon = hass.config.longitude
+    if (config_entry.data.get('NeerslagSensorUseHAforLocation') is False):
+        buienalarm_lat = config_entry.data.get('buienalarmLatitude')
+        buienalarm_lon = config_entry.data.get('buienalarmLongitude')
 
-    buienAlarm = NeerslagSensorBuienalarm.NeerslagSensorBuienalarm(hass, buienAlarm, buienAlarmLat, buienAlarmLon)
-    config_entry.add_update_listener(buienAlarm.config_update_listener)
+    buienalarm = NeerslagSensorBuienalarm.NeerslagSensorBuienalarm(hass, buienalarm_enabled, buienalarm_lat, buienalarm_lon)
+    config_entry.add_update_listener(buienalarm.config_update_listener)
 
     # Setup buienradar
-    buienRadar = (config_entry.data.get('buienradar') == True)
-    buienRadarLat = hass.config.latitude
-    buienRadarLon = hass.config.longitude
-    if (config_entry.data.get('NeerslagSensorUseHAforLocation') == False):
-        buienRadarLat = config_entry.data.get('buienradarLatitude')
-        buienRadarLon = config_entry.data.get('buienradarLongitude')
+    buienradar_enabled = (config_entry.data.get('buienradar') is True)
+    buienradar_lat = hass.config.latitude
+    buienradar_lon = hass.config.longitude
+    if (config_entry.data.get('NeerslagSensorUseHAforLocation') is False):
+        buienradar_lat = config_entry.data.get('buienradarLatitude')
+        buienradar_lon = config_entry.data.get('buienradarLongitude')
 
-    buienRadar = NeerslagSensorBuienradar.NeerslagSensorBuienradar(hass, buienRadar, buienRadarLat, buienRadarLon)
-    config_entry.add_update_listener(buienRadar.config_update_listener)
+    buienradar = NeerslagSensorBuienradar.NeerslagSensorBuienradar(hass, buienradar_enabled, buienradar_lat, buienradar_lon)
+    config_entry.add_update_listener(buienradar.config_update_listener)
 
     # Setup generic sensors
-    neerslagRainNow = NeerslagSensorStatus.NeerslagSensorStatus('neerslag_rain_now', 'neerslag-sensor-rain-now-1', (buienAlarm or buienRadar))
-    config_entry.add_update_listener(neerslagRainNow.config_update_listener)
+    neerslag_rain_now = NeerslagSensorStatus.NeerslagSensorStatus('neerslag_rain_now', 'neerslag-sensor-rain-now-1', (buienalarm_enabled or buienradar_enabled))
+    config_entry.add_update_listener(neerslag_rain_now.config_update_listener)
 
-    neerslagRainPrediction = NeerslagSensorStatus.NeerslagSensorStatus('neerslag_rain_prediction', 'neerslag-sensor-rain-prediction-1', (buienAlarm or buienRadar))
-    config_entry.add_update_listener(neerslagRainPrediction.config_update_listener)
+    neerslag_rain_prediction = NeerslagSensorStatus.NeerslagSensorStatus('neerslag_rain_prediction', 'neerslag-sensor-rain-prediction-1', (buienalarm_enabled or buienradar_enabled))
+    config_entry.add_update_listener(neerslag_rain_prediction.config_update_listener)
 
     # Add sensors to HA
-    async_add_entities([ buienAlarm, buienRadar, neerslagRainNow, neerslagRainPrediction ])
+    async_add_entities([ buienalarm, buienradar, neerslag_rain_now, neerslag_rain_prediction ])

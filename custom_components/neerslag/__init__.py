@@ -10,11 +10,12 @@ PLATFORMS = [ 'sensor' ]
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass, config_entry):
+    # pylint: disable=unused-argument
     hass.data.setdefault(DOMAIN, {})
 
     # Load frontend card
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    path_to_file = "{}/home-assistant-neerslag-card/neerslag-card.js".format(dir_path)
+    path_to_file = f'{dir_path}/home-assistant-neerslag-card/neerslag-card.js'
     hass.http.register_static_path(FRONTEND_SCRIPT_URL, str(path_to_file), False)
     frontend_script_url_with_parameter = FRONTEND_SCRIPT_URL + "?cache=" + str(time.time())
     add_extra_js_url(hass, frontend_script_url_with_parameter , es5=False)

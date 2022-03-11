@@ -1,27 +1,24 @@
 import csv
+import json
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from homeassistant.helpers.entity import Entity
 
 _LOGGER = logging.getLogger(__name__)
 
-# debugging - start
-import json
-from datetime import date
 def json_serial(obj):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    raise TypeError ("Type %s not serializable" % type(obj))
-# debugging - END
+    raise TypeError (f'Type {type(obj)} not serializable')
 
 # Cache  - since multiple sensors inherit from the base sensor.
-_last_data = {}
-_last_rain_now = ''
-_last_rain_now_attr = {}
-_last_rain_prediction = ""
-_last_rain_prediction_attr = {}
+_LAST_DATA = {}
+_LAST_RAIN_NOW = ''
+_LAST_RAIN_NOW_ATTR = {}
+_LAST_RAIN_PREDECTION = ""
+_LAST_RAIN_PREDECTION_ATTR = {}
 
 class NeerslagSensorBase(Entity):
     def __init__(self, hass, enabled: bool):
@@ -77,7 +74,7 @@ class NeerslagSensorBase(Entity):
     def update(self):
         return True
 
-    def getRainLevel(self, precip):
+    def get_rain_level(self, precip):
         # The following values are taken for the mm/hr precipitation:
         # - geen neerslag 0 mm
         # - lichte neerslag 0.1-1 mm
@@ -87,48 +84,48 @@ class NeerslagSensorBase(Entity):
         precip = round(precip, 1)
         if (precip < 0.1):
             return 'none'
-        elif (precip <= 1):
+        if (precip <= 1):
             return 'light'
-        elif (precip <= 3):
+        if (precip <= 3):
             return 'moderate'
-        elif (precip <= 10):
+        if (precip <= 10):
             return 'heavy'
         return 'extreme'
 
-    def getRainIcon(self, level):
+    def get_rain_icon(self, level):
         if (level == 'none'):
             return "mdi:weather-cloudy"
-        elif (level == 'light'):
+        if (level == 'light'):
             return "mdi:weather-partly-rainy"
-        elif (level == 'moderate'):
+        if (level == 'moderate'):
             return "mdi:weather-rainy"
         return "mdi:weather-pouring"
 
-    def initSensorAttributes(self, p, dt):
+    def init_sensor_attributes(self, precipitation, timestamp):
         attr = { }
-        attr['dry'] = (p == 0)
-        attr['from_dt'] = dt
-        attr['to_dt'] = dt
-        attr['mm_hr'] = p
-        attr['level'] = self.getRainLevel(p)
-        attr['icon'] = self.getRainIcon(attr['level'])
+        attr['dry'] = (precipitation == 0)
+        attr['from_dt'] = timestamp
+        attr['to_dt'] = timestamp
+        attr['mm_hr'] = precipitation
+        attr['level'] = self.get_rain_level(precipitation)
+        attr['icon'] = self.get_rain_icon(attr['level'])
         return attr
 
-    def equal_dicts(self, a, b, ignore_keys):
-        ka = set(a).difference(ignore_keys)
-        kb = set(b).difference(ignore_keys)
-        return ka == kb and all(a[k] == b[k] for k in ka)
+    def equal_dicts(self, dict_a, dict_b, ignore_keys):
+        keys_a = set(dict_a).difference(ignore_keys)
+        keys_b = set(dict_b).difference(ignore_keys)
+        return keys_a == keys_b and all(dict_a[key] == dict_b[key] for key in keys_a)
 
     def update_neerslag_sensor_cache(self, evt):
-        global _last_data
-        global _last_rain_now
-        global _last_rain_now_attr
-        global _last_rain_prediction
-        global _last_rain_prediction_attr
+        global _LAST_DATA
+        global _LAST_RAIN_NOW
+        global _LAST_RAIN_NOW_ATTR
+        global _LAST_RAIN_PREDECTION
+        global _LAST_RAIN_PREDECTION_ATTR
 
         # Save today date for comparison
         dt_today = datetime.today()
-        old_data = _last_data
+        old_data = _LAST_DATA
         new_data = evt['data']
 
         # Get sensor data for Buienalarm
@@ -178,14 +175,14 @@ class NeerslagSensorBase(Entity):
                 old_data[data_key]["buienradar"] = round(math.pow(10, ((int(entry[0]) - 109) / 32)), 3)
 
         # Only keep keys which are in the future
-        _last_data = {}
+        _LAST_DATA = {}
         dt_remove_before = dt_today.strftime("%Y%m%d%H%M%S")
         for key, val in old_data.items():
             if (key > dt_remove_before):
-                _last_data[key] = val
+                _LAST_DATA[key] = val
 
         # Data not yet complete
-        if (not len(_last_data)):
+        if (bool(_LAST_DATA) is False):
             _LOGGER.error('No items in buffer!')
             return
 
@@ -201,29 +198,29 @@ class NeerslagSensorBase(Entity):
         # Variables used below
         rain_prediction_text = ""
         rain_prediction_attr = None
-        maxP = 0
-        curP = 0
-        curDT = None
+        max_precipitation = 0
+        cur_precipitation = 0
+        cur_datetime = None
 
         # We can now loop the data and determine if it is dry or raining and when that will change...
-        for key, val in _last_data.items():
+        for key, val in _LAST_DATA.items():
             # Combine information from buienalarm and buienradar
-            p = 0
+            precipitation = 0
             if ('buienalarm' in val):
-                p += val['buienalarm']
+                precipitation += val['buienalarm']
 
             if ('buienradar' in val):
-                p += val['buienradar']
+                precipitation += val['buienradar']
 
             # We have a value, so now we can check it.
-            dt = datetime.strptime(key,'%Y%m%d%H%M%S')
+            timestamp = datetime.strptime(key, '%Y%m%d%H%M%S')
             if (raining_type is None):
                 # Save current precipitation
-                curP = p
-                curDT = dt
+                cur_precipitation = precipitation
+                cur_datetime = timestamp
 
                 # Compare it
-                if (p == 0):
+                if (precipitation == 0):
                     # Currently no rain
                     raining_type = 0
                     rain_prediction_text = self._translations['status']['stays_dry']
@@ -233,60 +230,60 @@ class NeerslagSensorBase(Entity):
                     rain_prediction_text = self._translations['status']['is_raining']
             else:
                 if (raining_type == 0):
-                    if (p > 0):
+                    if (precipitation > 0):
                         # Rain starts within 2 hours
                         raining_type = 4
-                        rain_prediction_text = self._translations['status']['starts'].format(dt)
+                        rain_prediction_text = self._translations['status']['starts'].format(timestamp)
 
                         # Initialize prediction attributes
                         if (rain_prediction_attr is None):
-                            rain_prediction_attr = self.initSensorAttributes(p, dt)
+                            rain_prediction_attr = self.init_sensor_attributes(precipitation, timestamp)
                 elif (raining_type == 1):
-                    if (p == 0):
+                    if (precipitation == 0):
                         # It is currently raining but will stop within 2 hours
                         raining_type = 2
-                        rain_prediction_text = self._translations['status']['stops'].format(dt)
+                        rain_prediction_text = self._translations['status']['stops'].format(timestamp)
 
                         # Initialize prediction attributes
                         if (rain_prediction_attr is None):
-                            rain_prediction_attr = self.initSensorAttributes(p, dt)
+                            rain_prediction_attr = self.init_sensor_attributes(precipitation, timestamp)
                 elif (raining_type == 2):
-                    if (p > 0):
+                    if (precipitation > 0):
                         # Raining will stop but restart within 2 hours
                         raining_type = 3
-                        rain_prediction_text += self._translations['status']['starts_again'].format(dt)
+                        rain_prediction_text += self._translations['status']['starts_again'].format(timestamp)
                 elif (raining_type == 4):
-                    if (p == 0):
+                    if (precipitation == 0):
                         # Rain starts within 2 hours but will stop
                         raining_type = 5
-                        rain_prediction_text += self._translations['status']['stops_at'].format(dt)
+                        rain_prediction_text += self._translations['status']['stops_at'].format(timestamp)
 
-            if (p > maxP):
-                maxP = p
+            if (precipitation > max_precipitation):
+                max_precipitation = precipitation
 
         # In case it remains dry or stays raining for a long time, this variable is still None, so fill it.
         if (rain_prediction_attr is None):
-            rain_prediction_attr = self.initSensorAttributes(p, dt)
+            rain_prediction_attr = self.init_sensor_attributes(precipitation, timestamp)
 
         # Update current state, but only if the input data changed.
-        rain_now_attr = self.initSensorAttributes(curP, curDT)
+        rain_now_attr = self.init_sensor_attributes(cur_precipitation, cur_datetime)
         rain_now = rain_now_attr['level']
 
         # Calculate how long this state 'lasts' but maximize it at 1.5hrs.
         # We maximize this because (depending on the data we get from both sources) otherwise it would sometimes be 105, sometimes 110 etc.
-        rain_now_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - curDT).total_seconds() / 60.0
+        rain_now_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - cur_datetime).total_seconds() / 60.0
         if (rain_now_attr['for_at_least'] > 90):
             rain_now_attr['for_at_least'] = 90
-        rain_now_attr['from_dt'] = curDT
-        rain_now_attr['to_dt'] = curDT + timedelta(minutes=rain_now_attr['for_at_least'])
+        rain_now_attr['from_dt'] = cur_datetime
+        rain_now_attr['to_dt'] = cur_datetime + timedelta(minutes=rain_now_attr['for_at_least'])
 
         # Compare states and update sensor if needed
-        rain_now_attr_equal = self.equal_dicts(rain_now_attr, _last_rain_now_attr, [ 'from_dt', 'to_dt' ])
-        if ((rain_now != _last_rain_now) or (not rain_now_attr_equal)):
-            _last_rain_now = rain_now
-            _last_rain_now_attr = rain_now_attr
+        rain_now_attr_equal = self.equal_dicts(rain_now_attr, _LAST_RAIN_NOW_ATTR, [ 'from_dt', 'to_dt' ])
+        if ((rain_now != _LAST_RAIN_NOW) or (not rain_now_attr_equal)):
+            _LAST_RAIN_NOW = rain_now
+            _LAST_RAIN_NOW_ATTR = rain_now_attr
             self._hass.states.set('sensor.neerslag_rain_now', rain_now, rain_now_attr, True)
-            _LOGGER.error('sensor.neerslag_rain_now changed to ' + _last_rain_now + ': ' + json.dumps(_last_rain_now_attr, default=json_serial))
+            _LOGGER.error('sensor.neerslag_rain_now changed to ' + _LAST_RAIN_NOW + ': ' + json.dumps(_LAST_RAIN_NOW_ATTR, default=json_serial))
 
 
         # Expected state (stays dry/stays raining/starts/stops/etc.) + expected_duration_in_minutes + expected_change_in_minutes?
@@ -295,17 +292,16 @@ class NeerslagSensorBase(Entity):
 
         # Calculate how long this state 'lasts' but maximize it at 1.5hrs.
         # We maximize this because (depending on the data we get from both sources) otherwise it would sometimes be 105, sometimes 110 etc.
-        rain_prediction_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - curDT).total_seconds() / 60.0
+        rain_prediction_attr['for_at_least'] = (rain_prediction_attr['to_dt'] - cur_datetime).total_seconds() / 60.0
         if (rain_prediction_attr['for_at_least'] > 90):
             rain_prediction_attr['for_at_least'] = 90
-        rain_prediction_attr['from_dt'] = curDT
-        rain_prediction_attr['to_dt'] = curDT + timedelta(minutes=rain_prediction_attr['for_at_least'])
+        rain_prediction_attr['from_dt'] = cur_datetime
+        rain_prediction_attr['to_dt'] = cur_datetime + timedelta(minutes=rain_prediction_attr['for_at_least'])
 
         # Compare states and update sensor if needed
-        rain_prediction_attr_equal = self.equal_dicts(rain_prediction_attr, _last_rain_prediction_attr, [ 'from_dt', 'to_dt' ])
-        if ((rain_prediction != _last_rain_prediction) or (not rain_prediction_attr_equal)):
-            _last_rain_prediction = rain_prediction
-            _last_rain_prediction_attr = rain_prediction_attr
+        rain_prediction_attr_equal = self.equal_dicts(rain_prediction_attr, _LAST_RAIN_PREDECTION_ATTR, [ 'from_dt', 'to_dt' ])
+        if ((rain_prediction != _LAST_RAIN_PREDECTION) or (not rain_prediction_attr_equal)):
+            _LAST_RAIN_PREDECTION = rain_prediction
+            _LAST_RAIN_PREDECTION_ATTR = rain_prediction_attr
             self._hass.states.set('sensor.neerslag_rain_prediction', rain_prediction, rain_prediction_attr, True)
-            _LOGGER.error('sensor.neerslag_rain_prediction changed to ' + _last_rain_prediction + ': ' + json.dumps(_last_rain_prediction_attr, default=json_serial))
-
+            _LOGGER.error('sensor.neerslag_rain_prediction changed to ' + _LAST_RAIN_PREDECTION + ': ' + json.dumps(_LAST_RAIN_PREDECTION_ATTR, default=json_serial))
