@@ -283,7 +283,7 @@ class NeerslagSensorBase(Entity):
             _LAST_RAIN_NOW = rain_now
             _LAST_RAIN_NOW_ATTR = rain_now_attr
             self._hass.states.set('sensor.neerslag_rain_now', rain_now, rain_now_attr, True)
-            _LOGGER.error('sensor.neerslag_rain_now changed to ' + _LAST_RAIN_NOW + ': ' + json.dumps(_LAST_RAIN_NOW_ATTR, default=json_serial))
+            _LOGGER.debug('sensor.neerslag_rain_now changed to ' + _LAST_RAIN_NOW + ': ' + json.dumps(_LAST_RAIN_NOW_ATTR, default=json_serial))
 
 
         # Expected state (stays dry/stays raining/starts/stops/etc.) + expected_duration_in_minutes + expected_change_in_minutes?
@@ -304,4 +304,4 @@ class NeerslagSensorBase(Entity):
             _LAST_RAIN_PREDECTION = rain_prediction
             _LAST_RAIN_PREDECTION_ATTR = rain_prediction_attr
             self._hass.states.set('sensor.neerslag_rain_prediction', rain_prediction, rain_prediction_attr, True)
-            _LOGGER.error('sensor.neerslag_rain_prediction changed to ' + _LAST_RAIN_PREDECTION + ': ' + json.dumps(_LAST_RAIN_PREDECTION_ATTR, default=json_serial))
+            _LOGGER.debug('sensor.neerslag_rain_prediction changed to ' + _LAST_RAIN_PREDECTION + ': ' + json.dumps(_LAST_RAIN_PREDECTION_ATTR, default=json_serial))
